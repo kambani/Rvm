@@ -1,0 +1,41 @@
+;
+; RVM.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider="Tintin Corporation"
+DriverVer=11/11/2018
+CatalogFile=RVM.cat
+
+[SourceDisksNames]
+1 ="rvm Installation Disk"
+
+[SourceDisksFiles]
+rvm.sys = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[DefaultInstall]
+CopyFiles = rvm_Files
+
+[DefaultInstall.Services]
+AddService = rvm,,rvm_Service
+
+[rvm_Files]
+rvm.sys,,,0x6
+
+[rvm_Service]
+DisplayName   = "Recoverable Virtual Memory"
+Description   = "Persistence and Light weight transactional gaurantees on virtual memory"
+ServiceBinary = %12%\rvm.sys
+ServiceType   = 1 ; kernel drive
+StartType     = 3 ; demand start
+ErrorControl  = 0 ; ignore errors
+AddReg        = rvm_Service_AddReg
+
+[rvm_Service_AddReg]
+HKR, Parameters
