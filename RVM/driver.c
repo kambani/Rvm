@@ -1,8 +1,18 @@
+///
+/// @file driver.c
+///
+/// Contains implementation of standard windows driver control routines.
+///
+/// Author: Kaushal Ambani (2018)
+///
+
 #include "precomp.h"
 DRIVER_INITIALIZE DriverEntry;
 
 _Dispatch_type_(IRP_MJ_DEVICE_CONTROL)
 DRIVER_DISPATCH RvmDispatchDeviceControl;
+
+RVM_GLOBAL_DATA RvmGlobalData = { 0 };
 
 NTSTATUS
 RvmDeviceControlRead(
@@ -38,12 +48,14 @@ RvmDeviceControlWrite(
 	case RvmOpWorkingSetCreate:
 		UNREFERENCED_PARAMETER(OutputLength);
 		BytesNeeded = RTL_SIZEOF_THROUGH_FIELD(RVM_IOCTL_WORKING_SET_CREATE,
-											   VolumeLetter);
+											   VolumeName);
 		if (BytesNeeded != InputLength) {
 			Status = STATUS_INFO_LENGTH_MISMATCH;
+			goto Done;
 		}
 		
-		Status = RvmWorkingSetCreate(Buffer);
+		Status = RvmWorkingSetCreate(&Buffer->WorkingSetCreate.VolumeName);
+Done:
 		break;
 	}
 
@@ -105,6 +117,7 @@ DriverEntry(
 	//
 
 	RtlInitUnicodeString(&DeviceName, RVM_DEVICE_NAME);
+	InitializeListHead(&RvmGlobalData.WorkingSetHead);
 
 	status = IoCreateDevice(DriverObject,
 							0,

@@ -140,7 +140,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="driver.c" />
-    <ClCompile Include="Rvm.c" />
+    <ClCompile Include="rvm.c" />
+    <ClCompile Include="storage.c" />
+    <ClCompile Include="utility.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="precomp.h" />
@@ -148,6 +150,7 @@
     <ClInclude Include="memory.h" />
     <ClInclude Include="rvm.h" />
     <ClInclude Include="storage.h" />
+    <ClInclude Include="utility.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

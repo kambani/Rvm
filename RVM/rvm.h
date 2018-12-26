@@ -1,3 +1,11 @@
+///
+/// @file rvm.h
+///
+/// Declarations of RVM APIs.
+///
+/// Author: Kaushal Ambani (2018)
+///
+
 #pragma once
 #include "storage.h"
 
@@ -10,14 +18,7 @@
 #define RVM_BLOCK_SIZE_LOG2 16
 #define RVM_BLOCK_SIZE (1 << RVM_BLOCK_SIZE_LOG2)
 
-typedef struct _RVM_GLOBAL_DATA {
-
-	//
-	// RVM device Object
-	//
-
-	PDEVICE_OBJECT RvmdeviceObject;
-} RVM_GLOBAL_DATA, *PRVM_GLOBAL_DATA;
+typedef ULONG RVM_HANDLE;
 
 typedef struct _RVM_WORKING_SET {
 
@@ -88,11 +89,10 @@ typedef enum _RVM_OPERATION {
 typedef struct _RVM_IOCTL_WORKING_SET_CREATE {
 
 	//
-	// Drive letter of the Volume to be used
-	// for DiskStore. Must be Upper case 'A' to 'Z'
+	// Volume Name in NT Path. For e.g \??\O: 
 	//
 
-	UCHAR VolumeLetter;
+	UNICODE_STRING VolumeName;
 
 } RVM_IOCTL_WORKING_SET_CREATE, *PRVM_IOCTL_WORKING_SET_CREATE;
 
@@ -102,3 +102,6 @@ typedef struct _RVM_IOCTL_BUFFER {
 		RVM_IOCTL_WORKING_SET_CREATE WorkingSetCreate;
 	};
 } RVM_IOCTL_BUFFER, *PRVM_IOCTL_BUFFER;
+
+RVM_HANDLE
+RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName);
