@@ -38,8 +38,8 @@ RvmDeviceControlWrite(
 	)
 
 {
-	NTSTATUS Status;
 	ULONG BytesNeeded;
+	NTSTATUS Status;
 
 	Status = STATUS_UNSUCCESSFUL;
 
@@ -54,8 +54,12 @@ RvmDeviceControlWrite(
 			goto Done;
 		}
 		
-		Status = RvmWorkingSetCreate(&Buffer->WorkingSetCreate.VolumeName);
+		Status = RvmWorkingSetCreate(&Buffer->WorkingSetCreate.VolumeName,
+									 &Buffer->WorkingSetCreate.Handle);
 Done:
+		break;
+
+	default:
 		break;
 	}
 

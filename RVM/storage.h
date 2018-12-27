@@ -7,10 +7,9 @@
 ///
 
 #pragma once
-#include <ntddk.h>
+#include <ntifs.h>
 
 #define RVM_DRIVE_SERIAL_SIZE 32
-DECLARE_CONST_UNICODE_STRING(RVM_RAW, L"RAW");
 typedef ULONG32 RVM_FRAME_INDEX;
 
 struct _RVM_DISK_STORE;
@@ -62,7 +61,7 @@ typedef struct _RVM_DISK_STORE {
 	// working set
 	//
 
-	RVM_VOLUME_IDENTIFIER VolumeIdentifier;
+	//RVM_VOLUME_IDENTIFIER VolumeIdentifier;
 
 	//
 	// The volume path used.  Note that this is NOT the persistent
@@ -106,21 +105,21 @@ typedef struct _RVM_DISK_STORE {
 	size_t UnusedDiskFrames;
 
 	//
-	// Size of the disk RVM_BLOCK_SIZE
+	// Size of the disk in multiples of
+	// RVM_BLOCK_SIZE
 	//
 
-	RVM_FRAME_INDEX SizeInBlocks;
+	ULONG64 SizeInBlocks;
 } RVM_DISK_STORE, *PRVM_DISK_STORE;
 
-NTSTATUS
-RvmStorageRetrieveVolumeIdentifier(
-	__in PUNICODE_STRING VolumeName,
-	__out PRVM_VOLUME_IDENTIFIER VolumeIdentifier
-);
+//NTSTATUS
+//RvmStorageRetrieveVolumeIdentifier(
+//	__in PUNICODE_STRING VolumeName,
+//	__out PRVM_VOLUME_IDENTIFIER VolumeIdentifier
+//	);
 
 NTSTATUS
 RvmStorageInitializeVolume(
 	__in PUNICODE_STRING VolumeName,
-	__inout PFILE_OBJECT FileObject,
-	__inout PHANDLE Handle,
-	__out PULONG SizeInBlocks);
+	__in PRVM_DISK_STORE DiskStore
+	);

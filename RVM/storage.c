@@ -8,95 +8,101 @@
 
 #include "precomp.h"
 
-NTSTATUS
-RvmStorageRetrieveVolumeIdentifier(
-	__in PUNICODE_STRING VolumeName,
-	__out PRVM_VOLUME_IDENTIFIER VolumeIdentifier
-)
+DECLARE_CONST_UNICODE_STRING(RVM_RAW, L"RAW");
 
-/*++
-
-Routine Description:
-
-This function accepts the name of a volume and generates its unique volume
-identifier.
-
-Arguments:
-
-VolumeName - Supplies a pointer to a unicode string representing the name
-of the volume for which a unique identifier is to be generated.
-
-VolumeIdentifier - Supplies a pointer to a buffer that will contain a
-unique, persistent (even across host OS updates) identifier of the
-volume.
-
-Return Value:
-
-Returns the final status of the operation.
-
---*/
-
-{
-	PDISK_EXTENT diskExtent;
-	PVOLUME_DISK_EXTENTS diskExtents;
-	ULONG diskNumber;
-	PUCHAR pch;
-	NTSTATUS status;
-
-	//
-	// The volume identifier consists of the serial number of the physical
-	// drive underlying the first extent of the volume.
-	//
-	// First, retrieve a description of the volume's disk extents.
-	//
-
-	diskExtents = NULL;
-	status = BcCacheStoreRetrieveDiskExtentsForVolume(VolumeName,
-													  &diskExtents);
-
-	if (!NT_SUCCESS(status)) {
-		goto done;
-	}
-
-	//
-	// If there are no extents, something is wrong.
-	// 
-
-	if (diskExtents->NumberOfDiskExtents == 0) {
-		status = STATUS_DEVICE_CONFIGURATION_ERROR;
-		goto done;
-	}
-
-	//
-	// Retrieve the storage device identifier from the physical disk.
-	//
-
-	diskExtent = &diskExtents->Extents[0];
-	diskNumber = diskExtent->DiskNumber;
-
-	VolumeIdentifier->VolumeOffset = diskExtent->StartingOffset.QuadPart;
-
-done:
-	if (diskExtents != NULL) {
-		RvmFree(diskExtents);
-	}
-
-	return status;
-}
+//NTSTATUS
+//RvmStorageRetrieveVolumeIdentifier(
+//	__in PUNICODE_STRING VolumeName,
+//	__out PRVM_VOLUME_IDENTIFIER VolumeIdentifier
+//)
+//
+///*++
+//
+//Routine Description:
+//
+//This function accepts the name of a volume and generates its unique volume
+//identifier.
+//
+//Arguments:
+//
+//VolumeName - Supplies a pointer to a unicode string representing the name
+//of the volume for which a unique identifier is to be generated.
+//
+//VolumeIdentifier - Supplies a pointer to a buffer that will contain a
+//unique, persistent (even across host OS updates) identifier of the
+//volume.
+//
+//Return Value:
+//
+//Returns the final status of the operation.
+//
+//--*/
+//
+//{
+//	PDISK_EXTENT diskExtent;
+//	PVOLUME_DISK_EXTENTS diskExtents;
+//	ULONG diskNumber;
+//	PUCHAR pch;
+//	NTSTATUS status;
+//
+//	//
+//	// The volume identifier consists of the serial number of the physical
+//	// drive underlying the first extent of the volume.
+//	//
+//	// First, retrieve a description of the volume's disk extents.
+//	//
+//
+//	diskExtents = NULL;
+//	status = STATUS_DEVICE_CONFIGURATION_ERROR;//BcCacheStoreRetrieveDiskExtentsForVolume(VolumeName,
+//			//										  &diskExtents);
+//
+//	if (!NT_SUCCESS(status)) {
+//		goto done;
+//	}
+//
+//	//
+//	// If there are no extents, something is wrong.
+//	// 
+//
+//	if (diskExtents->NumberOfDiskExtents == 0) {
+//		status = STATUS_DEVICE_CONFIGURATION_ERROR;
+//		goto done;
+//	}
+//
+//	//
+//	// Retrieve the storage device identifier from the physical disk.
+//	//
+//
+//	diskExtent = &diskExtents->Extents[0];
+//	diskNumber = diskExtent->DiskNumber;
+//
+//	VolumeIdentifier->VolumeOffset = diskExtent->StartingOffset.QuadPart;
+//
+//done:
+//	if (diskExtents != NULL) {
+//		RvmFree(diskExtents);
+//	}
+//
+//	return status;
+//}
 
 NTSTATUS
 RvmStorageInitializeVolume(
 	__in PUNICODE_STRING VolumeName,
-	__inout PFILE_OBJECT FileObject,
-	__inout PHANDLE Handle,
-	__out PULONG SizeInBlocks)
+	__in PRVM_DISK_STORE DiskStore
+	)
 
 {
 	ULONG access;
+	PFILE_OBJECT FileObject;
+	HANDLE Handle;
 	IO_STATUS_BLOCK ioStatus;
 	OBJECT_ATTRIBUTES objectAttributes;
 	ULONG64 sizeInBlocks;
 	NTSTATUS status;
+
+	//status = RvmStorageRetrieveVolumeIdentifier(VolumeName, &DiskStore->VolumeIdentifier);
+	FileObject = NULL;
 
 	union {
 		FILE_FS_SIZE_INFORMATION SizeInfo;
@@ -114,7 +120,7 @@ RvmStorageInitializeVolume(
 							   NULL);
 
 	access = GENERIC_READ | GENERIC_WRITE;
-	status = ZwCreateFile(Handle,
+	status = ZwCreateFile(&Handle,
 						  access,
 						  &objectAttributes,
 						  &ioStatus,
@@ -130,7 +136,7 @@ RvmStorageInitializeVolume(
 		goto error;
 	}
 
-	status = ObReferenceObjectByHandle(*Handle,
+	status = ObReferenceObjectByHandle(Handle,
 									   access,
 									   *IoFileObjectType,
 									   KernelMode,
@@ -145,7 +151,7 @@ RvmStorageInitializeVolume(
 	// Make sure this is a RAW partition.
 	//
 
-	status = ZwQueryVolumeInformationFile(*Handle,
+	status = ZwQueryVolumeInformationFile(Handle,
 										  &ioStatus,
 										  &local.AttributeInfo,
 										  sizeof(local),
@@ -178,7 +184,7 @@ RvmStorageInitializeVolume(
 	// Get the volume size in blocks.
 	// 
 
-	status = ZwQueryVolumeInformationFile(*Handle,
+	status = ZwQueryVolumeInformationFile(Handle,
 										  &ioStatus,
 										  &local.SizeInfo,
 										  sizeof(local),
@@ -200,7 +206,14 @@ RvmStorageInitializeVolume(
 		goto error;
 	}
 
-	*SizeInBlocks = sizeInBlocks;
+	//
+	// Everything looks good
+	// lets init the disk store
+	//
+
+	DiskStore->FileObject = FileObject;
+	DiskStore->Handle = Handle;
+	DiskStore->SizeInBlocks = sizeInBlocks;
 
 	return STATUS_SUCCESS;
 
@@ -209,8 +222,8 @@ error:
 		ObDereferenceObject(FileObject);
 	}
 
-	if (*Handle != NULL) {
-		ZwClose(*Handle);
+	if (Handle != NULL) {
+		ZwClose(Handle);
 	}
 
 	return status;

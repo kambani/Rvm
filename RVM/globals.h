@@ -23,19 +23,8 @@
 //const WCHAR _var ## _buffer[] = _string; \
 //const UNICODE_STRING _var = { sizeof(_string) - sizeof(WCHAR), sizeof(_string), (PWCH) _var ## _buffer }
 
-//
-// Pools Tags
-//
-
 #define RVM_PT 'mvR'
-
-
-typedef enum _RVM_OBJECT_ENUM {
-	RvmWorkingSet,
-	RvmSegment,
-	RvmTransaction,
-	RvmLogRecord
-} RVM_OBJECT_ENUM, *PRVM_OBJECT_ENUM;
+#define RVM_INVALID_INDEX ((ULONG) - 1)
 
 typedef struct _RVM_HANDLE_TABLE_ENTRY {
 	PVOID Address;
@@ -62,3 +51,5 @@ typedef struct _RVM_GLOBAL_DATA {
 	RVM_HANDLE_TABLE_ENTRY TransactionHandleTable[RVM_MAX_TRANSACTIONS];
 	RVM_HANDLE_TABLE_ENTRY LogRecordsHandleTable[RVM_MAX_LOGRECORDS];
 } RVM_GLOBAL_DATA, *PRVM_GLOBAL_DATA;
+
+extern RVM_GLOBAL_DATA RvmGlobalData;

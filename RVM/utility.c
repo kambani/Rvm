@@ -85,6 +85,9 @@ Arguments:
 
 	Object - Pointer to Object.
 
+	Entry - Pointer to LIST_ENTRY inside the object so it can be added to 
+			the global queue.
+
 Return Value:
 
 	RVM_HANDLE.
@@ -92,5 +95,40 @@ Return Value:
 --*/
 
 {
-	InsertTailList(&RvmGlobalData.WorkingSetHead, Entry);
+	ULONG Slot;
+	ULONG Index;
+	BOOLEAN Found;
+
+	Slot = (ULONG)ReadTimeStampCounter();
+	Found = FALSE;
+
+	switch (ObjectType) {
+	case RvmWorkingSet:
+		Index = Slot = Slot % RVM_MAX_WORKING_SETS;
+		do {
+			if (RvmGlobalData.WorkingSetHandleTable[Index].Address == NULL) {
+				Found = TRUE;
+				RvmGlobalData.WorkingSetHandleTable[Index].Address = Object;
+				Slot = Index;
+				break;
+			}
+
+			Index += 1;
+			if (Index >= RVM_MAX_WORKING_SETS) {
+				Index = 0;
+			}
+		} while (Index != Slot);
+
+		break;
+
+	default:
+		break;
+	}
+
+	if (Found != FALSE) {
+		InsertTailList(&RvmGlobalData.WorkingSetHead, Entry);
+		return Slot;
+	}
+
+	return RVM_INVALID_INDEX;
 }

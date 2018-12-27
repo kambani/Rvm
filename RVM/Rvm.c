@@ -8,8 +8,9 @@
 
 #include "precomp.h"
 
-NTSTATUS
-RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName)
+RVM_HANDLE
+RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName,
+					__out PRVM_HANDLE Handle)
 
 /*++
 
@@ -20,37 +21,41 @@ Routine Description:
 
 Arguments:
 
-	VolumeName - Volume Name in NT Path. For e.g \??\O: 
+	VolumeName - Volume Name in NT Path. For e.g \??\O:
+
+	Handle - Out Parameter to get Handle to Working Set
 
 Return Value:
 
-	Returns the final status of the operation.
+	Returns the Status of the operation.
 
 --*/
 
 {
 	NTSTATUS Status;
-	RVM_VOLUME_IDENTIFIER VolumeIdentifier;
 	PRVM_WORKING_SET WorkingSet;
-	RVM_HANDLE Handle;
 
-	Status = RvmStorageRetrieveVolumeIdentifier(VolumeName, &VolumeIdentifier);
-	if (!NT_SUCCESS(Status)) {
-		goto Done;
-	}
-
+	*Handle = RVM_INVALID_INDEX;
 	Status = RvmAllocate(NonPagedPool, 
 						 sizeof(RVM_WORKING_SET), 
 						 RVM_PT, 
-						 WorkingSet);
+						 &WorkingSet);
 
 	if (!NT_SUCCESS(Status)) {
-		return Status;
+		Status = STATUS_INSUFFICIENT_RESOURCES;
+		goto Done;
 	}
 
 	RtlZeroMemory(WorkingSet, sizeof(RVM_WORKING_SET));
-	Handle = RvmAddObject(RvmWorkingSet, WorkingSet);
-	//Status = RvmStorageInitializeVolume();
+	Status = RvmStorageInitializeVolume(VolumeName, 
+										&WorkingSet->DiskStore);
+
+	if (!NT_SUCCESS(Status)) {
+		RvmFree(WorkingSet);
+		goto Done;
+	}
+
+	*Handle = RvmAddObject(RvmWorkingSet, WorkingSet, &WorkingSet->Entry);
 
 Done:
 	return Status;

@@ -19,8 +19,28 @@
 #define RVM_BLOCK_SIZE (1 << RVM_BLOCK_SIZE_LOG2)
 
 typedef ULONG RVM_HANDLE;
+typedef PULONG PRVM_HANDLE;
+
+typedef enum _RVM_OBJECT_ENUM {
+	RvmWorkingSet,
+	RvmSegment,
+	RvmTransaction,
+	RvmLogRecord
+} RVM_OBJECT_ENUM, *PRVM_OBJECT_ENUM;
+
+typedef struct _RVM_OBJECT_HEADER {
+	LIST_ENTRY Entry;
+	RVM_OBJECT_ENUM ObjectType;
+	ULONG32 ReferenceCount;
+} RVM_OBJECT_HEADER, *PRVM_OBJECT_HEADER;
 
 typedef struct _RVM_WORKING_SET {
+
+	//
+	// Object Header;
+	//
+
+	RVM_OBJECT_HEADER;
 
 	//
 	// Pointer to next working set
@@ -50,7 +70,7 @@ typedef struct _RVM_WORKING_SET {
 	// Disk store associated with this working set
 	//
 
-	PRVM_DISK_STORE DiskStore;
+	RVM_DISK_STORE DiskStore;
 
 } RVM_WORKING_SET, *PRVM_WORKING_SET;
 
@@ -90,9 +110,17 @@ typedef struct _RVM_IOCTL_WORKING_SET_CREATE {
 
 	//
 	// Volume Name in NT Path. For e.g \??\O: 
+	// [In]
 	//
 
 	UNICODE_STRING VolumeName;
+
+	//
+	// Handle to the newly created 
+	// working set
+	//
+
+	RVM_HANDLE Handle;
 
 } RVM_IOCTL_WORKING_SET_CREATE, *PRVM_IOCTL_WORKING_SET_CREATE;
 
@@ -104,4 +132,5 @@ typedef struct _RVM_IOCTL_BUFFER {
 } RVM_IOCTL_BUFFER, *PRVM_IOCTL_BUFFER;
 
 RVM_HANDLE
-RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName);
+RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName,
+					__out PRVM_HANDLE Handle);
