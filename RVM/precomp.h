@@ -7,6 +7,7 @@
 #include "storage.h"
 #include "globals.h"
 #include "utility.h"
+#include "rvminterface.h"
 #include <ntifs.h>
 //#include <ntddk.h>
 #include <ntddvol.h>

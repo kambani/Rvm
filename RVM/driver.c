@@ -40,6 +40,7 @@ RvmDeviceControlWrite(
 {
 	ULONG BytesNeeded;
 	NTSTATUS Status;
+	UNICODE_STRING VolumeNameUnicode;
 
 	Status = STATUS_UNSUCCESSFUL;
 
@@ -53,8 +54,11 @@ RvmDeviceControlWrite(
 			Status = STATUS_INFO_LENGTH_MISMATCH;
 			goto Done;
 		}
-		
-		Status = RvmWorkingSetCreate(&Buffer->WorkingSetCreate.VolumeName,
+
+		RtlInitUnicodeString(&VolumeNameUnicode,
+							 &Buffer->WorkingSetCreate.VolumeName[0]);
+
+		Status = RvmWorkingSetCreate(&VolumeNameUnicode,
 									 &Buffer->WorkingSetCreate.Handle);
 Done:
 		break;

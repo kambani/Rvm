@@ -93,10 +93,10 @@ typedef struct _RVM_DISK_STORE {
 	SLIST_HEADER DiskFrameStack;
 
 	//
-	// Size in number of disk frames
+	// Lock for DiskFrameStack
 	//
 
-	size_t TotalDiskFrames;
+	KSPIN_LOCK DiskFrameStackLock;
 
 	//
 	// Currently unused disk frames

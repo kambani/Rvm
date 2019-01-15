@@ -102,35 +102,6 @@ typedef struct _RVM_SEGMENT {
 
 } RVM_SEGMENT, *PRVM_SEGMENT;
 
-typedef enum _RVM_OPERATION {
-	RvmOpWorkingSetCreate
-} RVM_OPERATION, *PRVM_OPERATION;
-
-typedef struct _RVM_IOCTL_WORKING_SET_CREATE {
-
-	//
-	// Volume Name in NT Path. For e.g \??\O: 
-	// [In]
-	//
-
-	UNICODE_STRING VolumeName;
-
-	//
-	// Handle to the newly created 
-	// working set
-	//
-
-	RVM_HANDLE Handle;
-
-} RVM_IOCTL_WORKING_SET_CREATE, *PRVM_IOCTL_WORKING_SET_CREATE;
-
-typedef struct _RVM_IOCTL_BUFFER {
-	RVM_OPERATION Operation;
-	union {
-		RVM_IOCTL_WORKING_SET_CREATE WorkingSetCreate;
-	};
-} RVM_IOCTL_BUFFER, *PRVM_IOCTL_BUFFER;
-
 RVM_HANDLE
 RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName,
 					__out PRVM_HANDLE Handle);

@@ -96,6 +96,7 @@ RvmStorageInitializeVolume(
 	ULONG access;
 	PFILE_OBJECT FileObject;
 	HANDLE Handle;
+	ULONG Index;
 	IO_STATUS_BLOCK ioStatus;
 	OBJECT_ATTRIBUTES objectAttributes;
 	ULONG64 sizeInBlocks;
@@ -103,6 +104,7 @@ RvmStorageInitializeVolume(
 
 	//status = RvmStorageRetrieveVolumeIdentifier(VolumeName, &DiskStore->VolumeIdentifier);
 	FileObject = NULL;
+	Index = 0;
 
 	union {
 		FILE_FS_SIZE_INFORMATION SizeInfo;
@@ -214,6 +216,30 @@ RvmStorageInitializeVolume(
 	DiskStore->FileObject = FileObject;
 	DiskStore->Handle = Handle;
 	DiskStore->SizeInBlocks = sizeInBlocks;
+	DiskStore->UnusedDiskFrames = sizeInBlocks;
+	ExInitializeSListHead(&DiskStore->DiskFrameStack);
+	KeInitializeSpinLock(&DiskStore->DiskFrameStackLock);
+	
+	//
+	// Allocate disk frame stack
+	//
+
+	RvmAllocate(NonPagedPool, 
+				sizeof(RVM_DISK_FRAME) * sizeInBlocks,
+				RVM_PT, 
+				&DiskStore->BaseDiskFrame);
+
+	memset(DiskStore->BaseDiskFrame, 
+		   0, 
+	       sizeof(RVM_DISK_FRAME) * sizeInBlocks);
+
+	for (Index = 0; Index < sizeInBlocks; Index++) {
+		DiskStore->BaseDiskFrame[Index].DiskFrame = Index;
+		DiskStore->BaseDiskFrame[Index].DiskStore = DiskStore;
+		ExInterlockedPushEntrySList(&DiskStore->DiskFrameStack,
+									&DiskStore->BaseDiskFrame[Index].Next,
+									&DiskStore->DiskFrameStackLock);
+	}
 
 	return STATUS_SUCCESS;
 
