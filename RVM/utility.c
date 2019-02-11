@@ -69,8 +69,7 @@ Return Value:
 RVM_HANDLE
 RvmAddObject(
 	__in RVM_OBJECT_ENUM ObjectType,
-	__in PVOID Object,
-	__in PLIST_ENTRY Entry
+	__in PVOID Object
 )
 
 /*++
@@ -81,7 +80,7 @@ Routine Description:
 
 Arguments:
 
-	RVM_OBJECT_ENUM - Rvm Object Type.
+	ObjectType - Rvm Object Type.
 
 	Object - Pointer to Object.
 
@@ -121,14 +120,128 @@ Return Value:
 
 		break;
 
+	case RvmSegment:
+		Index = Slot = Slot % RVM_MAX_SEGMENTS;
+		do {
+			if (RvmGlobalData.SegmentHandleTable[Index].Address == NULL) {
+				Found = TRUE;
+				RvmGlobalData.SegmentHandleTable[Index].Address = Object;
+				Slot = Index;
+				break;
+			}
+
+			Index += 1;
+			if (Index >= RVM_MAX_SEGMENTS) {
+				Index = 0;
+			}
+		} while (Index != Slot);
+
+		break;
+
 	default:
 		break;
 	}
 
 	if (Found != FALSE) {
-		InsertTailList(&RvmGlobalData.WorkingSetHead, Entry);
 		return Slot;
 	}
 
 	return RVM_INVALID_INDEX;
+}
+
+PVOID
+RvmGetObject(
+	__in RVM_OBJECT_ENUM ObjectType,
+	__in RVM_HANDLE Handle
+)
+
+/*++
+
+Routine Description:
+
+	Given a object handle, returns the address of the object
+	from the Global Handle Table.
+
+Arguments:
+
+	ObjectType - Rvm Object Type.
+
+	Handle - RVM_HANDLE.
+
+Return Value:
+
+	Memory Address of the object.
+
+--*/
+
+{
+
+	switch (ObjectType) {
+	case RvmWorkingSet:
+		if (Handle < RVM_MAX_WORKING_SETS) {
+			return RvmGlobalData.WorkingSetHandleTable[Handle].Address;
+		} else {
+			return NULL;
+		}
+
+		break;
+	case RvmSegment:
+		if (Handle < RVM_MAX_SEGMENTS) {
+			return RvmGlobalData.SegmentHandleTable[Handle].Address;
+		} else {
+			return NULL;
+		}
+
+		break;
+
+	default:
+		return NULL;
+	}
+}
+
+PVOID
+RvmWorkingSetCheckSegmentExists(
+	__in PRVM_WORKING_SET WorkingSet,
+	__in PGUID SegmentName
+)
+
+/*++
+
+Routine Description:
+
+	Checks if a segment of given name exists in
+	the working set. If yes returns pointer to that segment
+	else returns NULL.
+
+Arguments:
+
+	WorkingSet - WorkingSet.
+
+	SegmentName - Segment Name in GUID.
+
+Return Value:
+
+	Memory Address of Segment object.
+
+--*/
+
+{
+	PLIST_ENTRY Head;
+	PLIST_ENTRY Entry;
+	PRVM_SEGMENT Segment;
+	if (WorkingSet == NULL || SegmentName == NULL) {
+		return NULL;
+	}
+
+	Head = &WorkingSet->SegmentList;
+	Entry = Head->Flink;
+	while (Entry != Head) {
+		Segment = CONTAINING_RECORD(Entry, RVM_SEGMENT, NextSegment);
+		if (memcmp(&Segment->SegmentName, SegmentName, sizeof(GUID)) == 0) {
+			return Segment;
+		}
+		Entry = Entry->Flink;
+	}
+
+	return NULL;
 }

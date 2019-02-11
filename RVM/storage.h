@@ -8,9 +8,9 @@
 
 #pragma once
 #include <ntifs.h>
+#include "globals.h"
 
 #define RVM_DRIVE_SERIAL_SIZE 32
-typedef ULONG32 RVM_FRAME_INDEX;
 
 struct _RVM_DISK_STORE;
 typedef struct _RVM_DISK_STORE *PRVM_DISK_STORE;
@@ -34,10 +34,10 @@ typedef struct _RVM_DISK_FRAME {
 	SLIST_ENTRY Next;
 
 	//
-	// Disk Frame
+	// Disk Frame Index
 	//
 
-	RVM_FRAME_INDEX DiskFrame;
+	RVM_FRAME_INDEX Index;
 
 	//
 	// Disk Store
@@ -119,7 +119,7 @@ typedef struct _RVM_DISK_STORE {
 //	);
 
 NTSTATUS
-RvmStorageInitializeVolume(
+RvmStorageInitialize(
 	__in PUNICODE_STRING VolumeName,
 	__in PRVM_DISK_STORE DiskStore
 	);

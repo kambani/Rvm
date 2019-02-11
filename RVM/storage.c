@@ -87,10 +87,28 @@ DECLARE_CONST_UNICODE_STRING(RVM_RAW, L"RAW");
 //}
 
 NTSTATUS
-RvmStorageInitializeVolume(
+RvmStorageInitialize(
 	__in PUNICODE_STRING VolumeName,
 	__in PRVM_DISK_STORE DiskStore
 	)
+
+/*++
+
+Routine Description:
+
+	Initializes disk store of a working set
+
+Arguments:
+
+	VolumeName -  Volume Name in NT Path. For e.g \??\O:
+	
+	DiskStore - Disk Store.
+
+Return Value:
+
+	Returns the Status of the operation.
+
+--*/
 
 {
 	ULONG access;
@@ -234,7 +252,7 @@ RvmStorageInitializeVolume(
 	       sizeof(RVM_DISK_FRAME) * sizeInBlocks);
 
 	for (Index = 0; Index < sizeInBlocks; Index++) {
-		DiskStore->BaseDiskFrame[Index].DiskFrame = Index;
+		DiskStore->BaseDiskFrame[Index].Index = Index;
 		DiskStore->BaseDiskFrame[Index].DiskStore = DiskStore;
 		ExInterlockedPushEntrySList(&DiskStore->DiskFrameStack,
 									&DiskStore->BaseDiskFrame[Index].Next,

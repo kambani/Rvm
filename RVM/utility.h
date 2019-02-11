@@ -17,6 +17,17 @@ RvmAllocate(
 RVM_HANDLE
 RvmAddObject(
 	__in RVM_OBJECT_ENUM ObjectType,
-	__in PVOID Object,
-	__in PLIST_ENTRY Entry
+	__in PVOID Object
+	);
+
+PVOID
+RvmGetObject(
+	__in RVM_OBJECT_ENUM ObjectType,
+	__in RVM_HANDLE Handle
+	);
+
+PVOID
+RvmWorkingSetCheckSegmentExists(
+	__in PRVM_WORKING_SET WorkingSet,
+	__in PGUID SegmentName
 	);

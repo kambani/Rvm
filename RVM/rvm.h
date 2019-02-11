@@ -8,18 +8,13 @@
 
 #pragma once
 #include "storage.h"
-
-#define IOCTL_RVM_WRITE               \
-    CTL_CODE(FILE_DEVICE_UNKNOWN, 0, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define IOCTL_RVM_READ                \
-    CTL_CODE(FILE_DEVICE_UNKNOWN, 1, METHOD_BUFFERED, FILE_ANY_ACCESS)
+#include "memory.h"
+#include "rvminterface.h"
 
 #define RVM_BLOCK_SIZE_LOG2 16
 #define RVM_BLOCK_SIZE (1 << RVM_BLOCK_SIZE_LOG2)
-
-typedef ULONG RVM_HANDLE;
-typedef PULONG PRVM_HANDLE;
+#define RVM_MAX_MEMORY_MAPPABLE_LOG2 32
+#define RVM_MAX_MEMORY_MAPPABLE  (1UI64 << RVM_MAX_MEMORY_MAPPABLE_LOG2)
 
 typedef enum _RVM_OBJECT_ENUM {
 	RvmWorkingSet,
@@ -72,6 +67,13 @@ typedef struct _RVM_WORKING_SET {
 
 	RVM_DISK_STORE DiskStore;
 
+	//
+	// Memory Store associated with this
+	// working set
+	//
+
+	RVM_MEMORY_STORE MemoryStore;
+
 } RVM_WORKING_SET, *PRVM_WORKING_SET;
 
 typedef struct _RVM_SEGMENT {
@@ -83,25 +85,51 @@ typedef struct _RVM_SEGMENT {
 	LIST_ENTRY NextSegment;
 
 	//
-	// Rtl Hash of the segment Name
+	// Unique Name of the Segment
 	//
 
-	ULONG SegmentNameHash;
+	GUID SegmentName;
 
 	//
 	// Size of Segment. Integer multiple of RVM_BLOCK_SIZE
 	//
 
-	ULONG SegmentSize;
+	size_t SegmentSize;
 
 	//
-	// MDL representing this segment
+	// Handle of the segment if mapped
+	//
+	RVM_HANDLE SegmentHandle;
+
+	//
+	// MDL representing memory mapped
+	// by this segment
 	//
 
-	PMDL SegmentMdl;
+	MDL SegmentMdl;
+
+	//
+	// User Space VA
+	//
+
+	PVOID SegmentUserSpaceVA;
+
+	//
+	// Stack of RVM_MEMORY_FRAME representing 
+	// this segment
+	//
+	
+	SINGLE_LIST_ENTRY SegmentMemoryStack;
 
 } RVM_SEGMENT, *PRVM_SEGMENT;
 
-RVM_HANDLE
+NTSTATUS
 RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName,
 					__out PRVM_HANDLE Handle);
+
+NTSTATUS
+RvmSegmentCreate(__in RVM_HANDLE WorkingSetHandle,
+				 __in size_t Size,
+				 __out PVOID *UserSpaceVA,
+				 __inout PGUID SegmentName,
+				 __out PRVM_HANDLE SegmentHandle);

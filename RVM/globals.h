@@ -25,6 +25,7 @@
 
 #define RVM_PT 'mvR'
 #define RVM_INVALID_INDEX ((ULONG) - 1)
+typedef ULONG32 RVM_FRAME_INDEX;
 
 typedef struct _RVM_HANDLE_TABLE_ENTRY {
 	PVOID Address;

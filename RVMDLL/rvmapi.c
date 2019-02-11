@@ -31,7 +31,7 @@ Return Value:
 	}
 
 	Ioctl.Operation = RvmOpWorkingSetCreate;
-	Size = RTL_SIZEOF_THROUGH_FIELD(RVM_IOCTL_BUFFER, WorkingSetCreate);
+	Size = RTL_SIZEOF_THROUGH_FIELD(RVM_IOCTL_BUFFER, WorkingSetCreate.VolumeName);
 
 	//
 	// Convert Drive letter to NT style
