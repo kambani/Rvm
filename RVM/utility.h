@@ -31,3 +31,16 @@ RvmWorkingSetCheckSegmentExists(
 	__in PRVM_WORKING_SET WorkingSet,
 	__in PGUID SegmentName
 	);
+
+NTSTATUS
+RvmOpenConfigFile(
+	PHANDLE FileHandle,
+	PGUID SegmentName,
+	BOOLEAN Create
+    );
+
+NTSTATUS
+RvmReadConfigFile(
+	PHANDLE FileHandle,
+	PVOID *ConfigFile
+	);

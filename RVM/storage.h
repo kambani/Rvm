@@ -31,7 +31,7 @@ typedef struct _RVM_DISK_FRAME {
 	// Pointer to Next Entry
 	//
 
-	SLIST_ENTRY Next;
+	LIST_ENTRY Next;
 
 	//
 	// Disk Frame Index
@@ -90,13 +90,25 @@ typedef struct _RVM_DISK_STORE {
 	// Stack of Disk Frames
 	//
 
-	SLIST_HEADER DiskFrameStack;
+	LIST_ENTRY DiskFrameStack;
 
 	//
 	// Lock for DiskFrameStack
 	//
 
 	KSPIN_LOCK DiskFrameStackLock;
+
+	//
+	// Disk Frames under utilization
+	//
+
+	LIST_ENTRY UtilizedDiskFrames;
+
+	//
+	// Lock for UtilizedDiskFrames
+	//
+
+	KSPIN_LOCK UtilizedDiskFramesLock;
 
 	//
 	// Currently unused disk frames
@@ -119,7 +131,33 @@ typedef struct _RVM_DISK_STORE {
 //	);
 
 NTSTATUS
-RvmStorageInitialize(
+RvmDiskStoreInitialize(
 	__in PUNICODE_STRING VolumeName,
 	__in PRVM_DISK_STORE DiskStore
+	);
+
+FORCEINLINE
+VOID
+RvmDiskStoreAcquireLock(
+	__in PRVM_DISK_STORE DiskStore
+	);
+
+FORCEINLINE
+VOID
+RvmDiskStoreReleaseLock(
+	__in PRVM_DISK_STORE DiskStore
+	);
+
+NTSTATUS
+RvmDiskStoreGetFrames(
+	__in PRVM_DISK_STORE DiskStore,
+	__in PLIST_ENTRY InputStack,
+	__in size_t NumFrames
+	);
+
+NTSTATUS
+RvmDiskStoreReturnFrames(
+	__in PRVM_DISK_STORE DiskStore,
+	__in PLIST_ENTRY Stack,
+	__in size_t NumFrames
 	);

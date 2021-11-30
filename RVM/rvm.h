@@ -16,6 +16,8 @@
 #define RVM_MAX_MEMORY_MAPPABLE_LOG2 32
 #define RVM_MAX_MEMORY_MAPPABLE  (1UI64 << RVM_MAX_MEMORY_MAPPABLE_LOG2)
 
+#define RVM_CONFIG_FILE_PATH L"\\global??\\c:\\rvm.cfg"
+
 typedef enum _RVM_OBJECT_ENUM {
 	RvmWorkingSet,
 	RvmSegment,
@@ -121,7 +123,18 @@ typedef struct _RVM_SEGMENT {
 	
 	SINGLE_LIST_ENTRY SegmentMemoryStack;
 
+	//
+	// Stack of Disk Frames held by this segment.
+	//
+
+	LIST_ENTRY SegmentDiskStack;
+
 } RVM_SEGMENT, *PRVM_SEGMENT;
+
+typedef struct _RVM_CONFIG_FILE {
+	ULONG64 NumOfDiskFrames;
+	ULONG DiskFrames[];
+} RVM_CONFIG_FILE, *PRVM_CONFIG_FILE;
 
 NTSTATUS
 RvmWorkingSetCreate(__in PUNICODE_STRING VolumeName,

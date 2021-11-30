@@ -49,11 +49,11 @@ RvmDeviceControlWrite(
 	case RvmOpWorkingSetCreate:
 		UNREFERENCED_PARAMETER(OutputLength);
 		BytesNeeded = RTL_SIZEOF_THROUGH_FIELD(RVM_IOCTL_BUFFER, 
-											   WorkingSetCreate.VolumeName);
+											   WorkingSetCreate);
 
 		if (BytesNeeded != InputLength) {
 			Status = STATUS_INFO_LENGTH_MISMATCH;
-			goto Done;
+            break;
 		}
 
 		RtlInitUnicodeString(&VolumeNameUnicode,
@@ -61,11 +61,23 @@ RvmDeviceControlWrite(
 
 		Status = RvmWorkingSetCreate(&VolumeNameUnicode,
 									 &Buffer->WorkingSetCreate.Handle);
-Done:
 		break;
 
 	case RvmOpSegmentCreate:
 		UNREFERENCED_PARAMETER(OutputLength);
+		BytesNeeded = RTL_SIZEOF_THROUGH_FIELD(RVM_IOCTL_BUFFER,
+											   SegmentCreate);
+
+		if (BytesNeeded != InputLength) {
+			Status = STATUS_INFO_LENGTH_MISMATCH;
+			break;
+		}
+
+        Status = RvmSegmentCreate(Buffer->SegmentCreate.WorkingSethandle,
+                                  Buffer->SegmentCreate.Size,
+                                  &Buffer->SegmentCreate.UserSpaceVA,
+                                  &Buffer->SegmentCreate.SegmentName,
+                                  &Buffer->SegmentCreate.SegmentHandle);
 		break;
 
 	default:

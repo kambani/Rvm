@@ -51,8 +51,8 @@ Return Value:
 	//
 	// Initialize Disk Store
 	//
-	Status = RvmStorageInitialize(VolumeName,
-								  &WorkingSet->DiskStore);
+	Status = RvmDiskStoreInitialize(VolumeName,
+								    &WorkingSet->DiskStore);
 	if (!NT_SUCCESS(Status)) {
 		goto Done;
 	}
@@ -126,18 +126,32 @@ Return Value:
 
 {
 	PVOID AllocatedMemoryKernelVa;
+	ULONG_PTR BaseAddress;
+	HANDLE ConfigFileHandle;
+	PRVM_CONFIG_FILE ConfigFile;
 	BOOLEAN CleanMemory;
+	PRVM_DISK_FRAME DiskFrame;
+	PLIST_ENTRY DiskStackEntry;
+	PVOID FileContent;
 	BOOLEAN FreeSegment;
+	PSINGLE_LIST_ENTRY MemoryStackEntry;
+	PRVM_MEMORY_FRAME MemoryFrame;
 	size_t NumMemoryBlock;
-	BOOLEAN ReturnFrames;
+	BOOLEAN ReturnMemoryFrames;
+	BOOLEAN ReturnDiskFrames;
 	PRVM_SEGMENT Segment;
 	NTSTATUS Status;
 	PRVM_WORKING_SET WorkingSet;
 
 	AllocatedMemoryKernelVa = NULL;
+	BaseAddress = 0;
+	ConfigFileHandle = NULL;
 	CleanMemory = FALSE;
 	FreeSegment = FALSE;
-	ReturnFrames = FALSE;
+	MemoryStackEntry = NULL;
+	DiskStackEntry = NULL;
+	ReturnMemoryFrames = FALSE;
+	ReturnDiskFrames = FALSE;
 	Status = STATUS_UNSUCCESSFUL;
 	*UserSpaceVA = NULL;
 	*SegmentHandle = RVM_INVALID_INDEX;
@@ -170,6 +184,34 @@ Return Value:
 			// Check the config file if the segment
 			// exists on the disk.
 			//
+
+			Status = RvmOpenConfigFile(&ConfigFileHandle,
+									   &Segment->SegmentName,
+									   FALSE);
+
+			if (!NT_SUCCESS(Status)) {
+
+				//
+				// No segment exists with given 
+				// segment name. Return Error.
+				//
+
+				goto Done;
+			}
+
+			Status = RvmReadConfigFile(&ConfigFileHandle,
+									   &FileContent);
+			if (!NT_SUCCESS(Status)) {
+				goto Done;
+			}
+
+			//
+			// Process the config file,
+			// read the data from the disks from respective
+			// offsets.
+			//
+
+			ConfigFile = (PRVM_CONFIG_FILE)FileContent;
 		}
 
 	} else {
@@ -187,7 +229,7 @@ Return Value:
 		}
 		memset(Segment, 0, sizeof(RVM_SEGMENT));
 		NumMemoryBlock = Size / RVM_BLOCK_SIZE;
-		Segment->SegmentSize = NumMemoryBlock * sizeof(RVM_BLOCK_SIZE);
+		Segment->SegmentSize = NumMemoryBlock;
 		ExUuidCreate(&Segment->SegmentName);
 
 		//
@@ -203,18 +245,57 @@ Return Value:
 		}
 
 		//
+		// Try to yank out equivalent disk frames
+		//
+
+		Status = RvmDiskStoreGetFrames(&WorkingSet->DiskStore,
+									   &Segment->SegmentDiskStack,
+									   NumMemoryBlock);
+		if (!NT_SUCCESS(Status)) {
+			FreeSegment = TRUE;
+			ReturnMemoryFrames = TRUE;
+			goto Done;
+		}
+
+		//
 		// Allocate Non Paged memory of the size requested
 		//
 
 		Status = RvmAllocate(NonPagedPool,
-							 Segment->SegmentSize,
+							 Segment->SegmentSize * sizeof(RVM_BLOCK_SIZE),
 							 RVM_PT,
 							 &AllocatedMemoryKernelVa);
 		if (!NT_SUCCESS(Status)) {
 			FreeSegment = TRUE;
-			ReturnFrames = TRUE;
+			ReturnMemoryFrames = TRUE;
+			ReturnDiskFrames = TRUE;
 			goto Done;
 		}
+
+		//
+		// Map the memory frame into corresponding disk frame.
+		//
+
+		MemoryStackEntry = Segment->SegmentMemoryStack.Next;
+		DiskStackEntry = Segment->SegmentDiskStack.Flink;
+		BaseAddress = *(PULONG_PTR)&AllocatedMemoryKernelVa;
+		while (MemoryStackEntry != NULL &&
+			   DiskStackEntry != &Segment->SegmentDiskStack) {
+			MemoryFrame = CONTAINING_RECORD(MemoryStackEntry,
+											RVM_MEMORY_FRAME,
+											Next);
+			MemoryFrame->BaseAddress = (PVOID)BaseAddress;
+			BaseAddress += RVM_BLOCK_SIZE;
+			DiskFrame = CONTAINING_RECORD(DiskStackEntry,
+										  RVM_DISK_FRAME,
+										  Next);
+			MemoryFrame->DiskFrame = DiskFrame->Index;
+			MemoryStackEntry = MemoryStackEntry->Next;
+			DiskStackEntry = DiskStackEntry->Flink;
+		}
+
+		NT_ASSERT(MemoryStackEntry == NULL);
+		NT_ASSERT(DiskStackEntry == NULL);
 
 		//
 		// Map kernel mode memory into user space.
@@ -233,22 +314,18 @@ Return Value:
 		if (Segment->SegmentUserSpaceVA == NULL) {
 			FreeSegment = TRUE;
 			CleanMemory = TRUE;
-			ReturnFrames = TRUE;
+			ReturnMemoryFrames = TRUE;
+			ReturnDiskFrames = TRUE;
 			IoFreeMdl(&Segment->SegmentMdl);
 			Status = STATUS_INSUFFICIENT_RESOURCES;
 			goto Done;
 		}
 
 		//
-		// Map Memory Frames into Disk
-		//
-
-		//
 		// We now have the segment ready
 		//
 
 		Segment->SegmentHandle = RvmAddObject(RvmSegment, Segment);
-
 	}
 
 Done:
@@ -257,14 +334,24 @@ Done:
 		RvmFree(AllocatedMemoryKernelVa);
 	}
 
-	if (ReturnFrames == TRUE) {
+	if (ReturnMemoryFrames == TRUE) {
 		RvmMemoryStoreReturnFrames(&WorkingSet->MemoryStore,
 								   &Segment->SegmentMemoryStack,
 								   Segment->SegmentSize);
 	}
 
+	if (ReturnDiskFrames == TRUE) {
+		RvmDiskStoreReturnFrames(&WorkingSet->DiskStore,
+								 &Segment->SegmentDiskStack,
+								 Segment->SegmentSize);
+	}
+
 	if (FreeSegment == TRUE) {
 		RvmFree(Segment);
+	}
+
+	if (ConfigFileHandle != NULL) {
+		ZwClose(ConfigFileHandle);
 	}
 
 	if (NT_SUCCESS(Status)) {

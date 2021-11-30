@@ -245,3 +245,142 @@ Return Value:
 
 	return NULL;
 }
+
+NTSTATUS
+RvmOpenConfigFile(
+	PHANDLE FileHandle,
+	PGUID SegmentName,
+	BOOLEAN Create
+)
+
+/*++
+
+Routine Description:
+
+	Opens Rvm config File of a given segment.
+
+Arguments:
+
+	FileHandle - Handle to the file.
+
+	SegmentName - Segment Name in GUID.
+
+	Create - Create if file does not exists
+
+Return Value:
+
+	NTSTATUS.
+
+--*/
+
+{
+	UNICODE_STRING FileName;
+    IO_STATUS_BLOCK iosb;
+    OBJECT_ATTRIBUTES objectAttributes;
+    NTSTATUS Status;
+
+	UNREFERENCED_PARAMETER(Create);
+	DECLARE_UNICODE_STRING(FilePath, RVM_CONFIG_FILE_PATH);
+	RtlStringFromGUID(SegmentName, &FileName);
+	RtlAppendUnicodeStringToString(&FilePath, &FileName);
+    InitializeObjectAttributes(&objectAttributes,
+                               &FilePath,
+                               OBJ_KERNEL_HANDLE,
+                               NULL,
+                               NULL);
+
+    Status = ZwCreateFile(FileHandle,
+                          FILE_READ_DATA | FILE_WRITE_DATA,
+                          &objectAttributes,
+                          &iosb,
+                          0,
+                          FILE_ATTRIBUTE_NORMAL,
+                          0,
+                          FILE_OPEN,
+                          FILE_WRITE_THROUGH |
+                          FILE_NO_INTERMEDIATE_BUFFERING |
+                          FILE_SYNCHRONOUS_IO_NONALERT,
+                          NULL,
+                          0);
+
+    return Status;
+}
+
+NTSTATUS
+RvmReadConfigFile(
+	PHANDLE FileHandle,
+	PVOID *FileContent
+)
+
+/*++
+
+Routine Description:
+
+	Reads the already opened config file.
+
+Arguments:
+
+	FileHandle - Handle to the file already opened via
+				 RvmOpenConfigFile.
+
+	ConfigFile - Buffer containing contents of the Config file.
+
+Return Value:
+
+	NTSTATUS.
+
+--*/
+
+{
+	IO_STATUS_BLOCK iosb;
+	ULONG FileSize;
+	LARGE_INTEGER Offset;
+	FILE_STANDARD_INFORMATION StandardInfo;
+	NTSTATUS Status;
+
+	if (FileHandle == NULL) {
+		return STATUS_NOT_FOUND;
+	}
+
+	Status = ZwQueryInformationFile(FileHandle,
+									&iosb,
+									&StandardInfo,
+									sizeof(StandardInfo),
+									FileStandardInformation);
+
+	if (!NT_SUCCESS(Status)) {
+		return Status;
+	}
+
+	//
+    // Allocate a buffer and read it in.
+    //
+
+	FileSize = StandardInfo.EndOfFile.LowPart;
+	Status = RvmAllocate(NonPagedPool, 
+						 FileSize, 
+						 RVM_PT, 
+						 FileContent);
+
+	if (!NT_SUCCESS(Status)) {
+		return Status;
+	}
+
+	Offset.QuadPart = 0;
+	Status = ZwReadFile(FileHandle,
+						NULL,
+						NULL,
+						NULL,
+						&iosb,
+						*FileContent,
+						FileSize,
+						&Offset,
+						NULL);
+
+	if (!NT_SUCCESS(Status)) {
+		RvmFree(*FileContent);
+		return Status;
+	}
+
+	return Status;
+}

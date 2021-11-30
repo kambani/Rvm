@@ -192,6 +192,42 @@ Return Value:
 	return Status;
 }
 
+FORCEINLINE
+VOID
+RvmiMemoryStoreCleanFrame(
+	__in PRVM_MEMORY_FRAME MemoryFrame
+	)
+
+/*++
+
+Routine Description:
+
+	Cleans up a memory frame for reuse.
+
+Arguments:
+
+	MemoryFrame - Rvm Memory frame.
+
+Return Value:
+
+	None.
+
+--*/
+
+{
+	if (MemoryFrame != NULL) {
+		MemoryFrame->DiskFrame = RVM_INVALID_INDEX;
+
+		//
+		// Undo Log memory to be freed by the Transactional process
+		//
+		MemoryFrame->UndoLog = NULL;
+		MemoryFrame->BaseAddress = NULL;
+		MemoryFrame->UnderTransaction = FALSE;
+		//Add for other flags as they are introduced.
+	}
+}
+
 NTSTATUS
 RvmMemoryStoreReturnFrames(
 	__in PRVM_MEMORY_STORE MemoryStore,
@@ -219,6 +255,7 @@ Return Value:
 --*/
 
 {
+	PRVM_MEMORY_FRAME MemoryFrame;
 	PSINGLE_LIST_ENTRY SEntry;
 
 	if (MemoryStore == NULL || Stack == NULL ||
@@ -229,6 +266,8 @@ Return Value:
 	RvmMemoryStoreAcquireLock(MemoryStore);
 	while (NumFrames > 0) {
 		SEntry = PopEntryList(Stack);
+		MemoryFrame = CONTAINING_RECORD(SEntry, RVM_MEMORY_FRAME, Next);
+		RvmiMemoryStoreCleanFrame(MemoryFrame);
 		PushEntryList(&MemoryStore->MemoryFrameStack,
 					  SEntry);
 		NumFrames--;

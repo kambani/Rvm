@@ -23,6 +23,10 @@
 //const WCHAR _var ## _buffer[] = _string; \
 //const UNICODE_STRING _var = { sizeof(_string) - sizeof(WCHAR), sizeof(_string), (PWCH) _var ## _buffer }
 
+#define DECLARE_UNICODE_STRING(_var, _string) \
+WCHAR _var ## _buffer[] = _string; \
+UNICODE_STRING _var = { sizeof(_string) - sizeof(WCHAR), sizeof(_string), _var ## _buffer } 
+
 #define RVM_PT 'mvR'
 #define RVM_INVALID_INDEX ((ULONG) - 1)
 typedef ULONG32 RVM_FRAME_INDEX;

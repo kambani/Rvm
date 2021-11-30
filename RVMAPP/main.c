@@ -1,7 +1,9 @@
 // RvmApp.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include <windows.h>
+#define WIN32_NO_STATUS
+#include <Windows.h>
+#undef WIN32_NO_STATUS
 #include <ntstatus.h>
 #include <stdio.h>
 #include "rvmapi.h"

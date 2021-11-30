@@ -87,7 +87,7 @@ DECLARE_CONST_UNICODE_STRING(RVM_RAW, L"RAW");
 //}
 
 NTSTATUS
-RvmStorageInitialize(
+RvmDiskStoreInitialize(
 	__in PUNICODE_STRING VolumeName,
 	__in PRVM_DISK_STORE DiskStore
 	)
@@ -235,8 +235,10 @@ Return Value:
 	DiskStore->Handle = Handle;
 	DiskStore->SizeInBlocks = sizeInBlocks;
 	DiskStore->UnusedDiskFrames = sizeInBlocks;
-	ExInitializeSListHead(&DiskStore->DiskFrameStack);
+	InitializeListHead(&DiskStore->DiskFrameStack);
 	KeInitializeSpinLock(&DiskStore->DiskFrameStackLock);
+	InitializeListHead(&DiskStore->UtilizedDiskFrames);
+	KeInitializeSpinLock(&DiskStore->UtilizedDiskFramesLock);
 	
 	//
 	// Allocate disk frame stack
@@ -254,9 +256,8 @@ Return Value:
 	for (Index = 0; Index < sizeInBlocks; Index++) {
 		DiskStore->BaseDiskFrame[Index].Index = Index;
 		DiskStore->BaseDiskFrame[Index].DiskStore = DiskStore;
-		ExInterlockedPushEntrySList(&DiskStore->DiskFrameStack,
-									&DiskStore->BaseDiskFrame[Index].Next,
-									&DiskStore->DiskFrameStackLock);
+		InsertHeadList(&DiskStore->DiskFrameStack,
+					   &DiskStore->BaseDiskFrame[Index].Next);
 	}
 
 	return STATUS_SUCCESS;
@@ -272,3 +273,241 @@ error:
 
 	return status;
 }
+
+FORCEINLINE
+VOID
+RvmDiskStoreAcquireLock(
+	__in PRVM_DISK_STORE DiskStore
+)
+
+/*++
+
+Routine Description:
+
+	Acquires locks on the DiskStore.
+
+Arguments:
+
+	DiskStore - Rvm Disk Store.
+
+Return Value:
+
+	None.
+
+--*/
+
+{
+	KIRQL Irql;
+
+	if (DiskStore != NULL) {
+		KeAcquireSpinLock(&DiskStore->DiskFrameStackLock, &Irql);
+	}
+}
+
+FORCEINLINE
+VOID
+RvmDiskStoreReleaseLock(
+	__in PRVM_DISK_STORE DiskStore
+)
+
+/*++
+
+Routine Description:
+
+	Releases locks on the DiskStore.
+
+Arguments:
+
+	DiskStore - Rvm Disk Store.
+
+Return Value:
+
+	None.
+
+--*/
+
+{
+	KIRQL Irql;
+
+	memset(&Irql, 0, sizeof(KIRQL));
+	if (DiskStore != NULL) {
+		KeReleaseSpinLock(&DiskStore->DiskFrameStackLock, Irql);
+	}
+}
+
+
+NTSTATUS
+RvmDiskStoreGetFrames(
+	__in PRVM_DISK_STORE DiskStore,
+	__in PLIST_ENTRY InputStack,
+	__in size_t NumFrames
+)
+
+/*++
+
+Routine Description:
+
+	Pours required disk frames from the stack of DiskStore
+	into InputStack
+
+Arguments:
+
+	DiskStore - Rvm Disk Store.
+	InputStack - Stack into which you want the memory frames.
+	NumFrames - Number of frames needed.
+
+Return Value:
+
+	Returns the Status of the operation.
+
+--*/
+
+{
+	PLIST_ENTRY SEntry;
+	NTSTATUS  Status;
+
+	if (DiskStore == NULL || InputStack == NULL ||
+		NumFrames <= 0) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	RvmDiskStoreAcquireLock(DiskStore);
+	if (DiskStore->UnusedDiskFrames >= NumFrames) {
+		while (NumFrames > 0) {
+			SEntry = RemoveHeadList(&DiskStore->DiskFrameStack);
+			InsertHeadList(InputStack,
+						   SEntry);
+			NumFrames--;
+		}
+
+		Status = STATUS_SUCCESS;
+	}
+	else {
+		Status = STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	RvmDiskStoreReleaseLock(DiskStore);
+	return Status;
+}
+
+NTSTATUS
+RvmDiskStoreReturnFrames(
+	__in PRVM_DISK_STORE DiskStore,
+	__in PLIST_ENTRY Stack,
+	__in size_t NumFrames
+)
+
+/*++
+
+Routine Description:
+
+	Returns all the memory frames from Stack into
+	Disk Store
+
+Arguments:
+
+	MemoryStore - Rvm Disk Store.
+	Stack - Stack from which you want to return disk frames.
+	NumFrames - Number of frames.
+
+Return Value:
+
+	Returns the Status of the operation.
+
+--*/
+
+{
+	PLIST_ENTRY SEntry;
+
+	if (DiskStore == NULL || Stack == NULL ||
+		NumFrames <= 0) {
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	RvmDiskStoreAcquireLock(DiskStore);
+	while (NumFrames > 0) {
+		//TODO. Clean up frames before returning them
+		SEntry = RemoveHeadList(Stack);
+		InsertHeadList(&DiskStore->DiskFrameStack,
+					   SEntry);
+		NumFrames--;
+	}
+
+	RvmDiskStoreReleaseLock(DiskStore);
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS
+RvmiBuildDiskDriverRequest(
+    __out PIRP *Irp,
+    __in UCHAR MajorFunction,
+    __in BOOLEAN Paging,
+    __in PFILE_OBJECT FileObject,
+    __in PMDL Mdl,
+    __in ULONG Length,
+    __in ULONG64 StartingOffset,
+    __in PIO_STATUS_BLOCK IoStatusBlock
+)
+{
+
+    PVOID buffer;
+    PVOID callerBuffer;
+    PDEVICE_OBJECT deviceObject;
+    PIRP irp;
+    PIO_STACK_LOCATION irpSp;
+
+    buffer = NULL;
+    deviceObject = IoGetRelatedDeviceObject(FileObject);
+    irp = IoAllocateIrp(deviceObject->StackSize, FALSE);
+    if (irp == NULL) {
+        goto error;
+    }
+
+    irp->UserIosb = IoStatusBlock;
+    irp->Flags |= IRP_NOCACHE;
+    if (Paging != FALSE) {
+        irp->Flags |= IRP_PAGING_IO;
+    }
+
+    irp->Tail.Overlay.Thread = PsGetCurrentThread();
+
+    irpSp = IoGetNextIrpStackLocation(irp);
+    irpSp->MajorFunction = MajorFunction;
+    irpSp->FileObject = FileObject;
+    irpSp->DeviceObject = deviceObject;
+    if ((MajorFunction == IRP_MJ_READ) || (MajorFunction == IRP_MJ_WRITE)) {
+
+        C_ASSERT(FIELD_OFFSET(IO_STACK_LOCATION, Parameters.Read.Length) ==
+            FIELD_OFFSET(IO_STACK_LOCATION, Parameters.Write.Length));
+
+        C_ASSERT(FIELD_OFFSET(IO_STACK_LOCATION, Parameters.Read.ByteOffset) ==
+            FIELD_OFFSET(IO_STACK_LOCATION, Parameters.Write.ByteOffset));
+
+        irpSp->Parameters.Read.Length = Length;
+        irpSp->Parameters.Read.ByteOffset.QuadPart = StartingOffset;
+
+        //
+        // If the target device requests direct I/O or this is a paging I/O then
+        // a pointer to the MDL is passed down.
+        //
+
+        irp->MdlAddress = Mdl;
+        callerBuffer = NULL;
+    }
+
+    *Irp = irp;
+    return STATUS_SUCCESS;
+
+error:
+
+    if (irp != NULL) {
+        IoFreeIrp(irp);
+    }
+
+    if (buffer != NULL) {
+        ExFreePool(buffer);
+    }
+
+    return STATUS_INSUFFICIENT_RESOURCES;
+}
+

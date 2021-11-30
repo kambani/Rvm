@@ -44,7 +44,8 @@ typedef struct _RVM_MEMORY_FRAME {
 	RVM_FRAME_INDEX DiskFrame;
 
 	//
-	// Base Memory Address
+	// Memory Address of the block
+	// this frame is representing.
 	//
 
 	PVOID BaseAddress;
@@ -100,11 +101,13 @@ typedef struct _RVM_MEMORY_STORE {
 	ULONG64 SizeInBlocks;
 } RVM_MEMORY_STORE, *PRVM_MEMORY_STORE;
 
+FORCEINLINE
 VOID
 RvmMemoryStoreAcquireLock(
 	__in PRVM_MEMORY_STORE MemoryStore
-);
+	);
 
+FORCEINLINE
 VOID
 RvmMemoryStoreReleaseLock(
 	__in PRVM_MEMORY_STORE MemoryStore

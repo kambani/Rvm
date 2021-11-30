@@ -27,14 +27,13 @@ typedef enum _RVM_OPERATION {
 typedef struct _RVM_IOCTL_WORKING_SET_CREATE {
 
 	//
-	// Volume Name in NT Path style. For e.g \??\O: 
-	// [In]
+	// [In] Volume Name in NT Path style. For e.g \??\O: 
 	//
 
 	WCHAR VolumeName[MAX_NT_VOLUME_LENGTH];
 
 	//
-	// Handle to the newly created 
+	// [Out] Handle to the newly created 
 	// working set
 	//
 
@@ -45,23 +44,37 @@ typedef struct _RVM_IOCTL_WORKING_SET_CREATE {
 typedef struct _RVM_IOCTL_SEGMENT_CREATE {
 
 	//
-	// Handle to already created
-	// working set
+	// [Out] User Space address to new mapped memory
+	// in kernel mode.
 	//
 
-	RVM_HANDLE Handle;
+	PVOID UserSpaceVA;
 
 	//
-	// Size in multiple of RVM_BLOCK_SIZE
+	// [In] Size in multiple of RVM_BLOCK_SIZE
 	//
 
 	size_t Size;
 
 	//
-	// [out] Segment Identifier
+	// [In][Out] Segment Identifier
+	// [In] When trying to map existing segment
+	// [Out] New mapping when you get new Name
 	//
 
-	GUID SegmentHandle;
+	GUID SegmentName;
+
+    //
+    // [In] Active Working Set Handle
+    //
+
+    RVM_HANDLE WorkingSethandle;
+
+	//
+	// [Out] Handle to already created Segment
+	//
+
+	RVM_HANDLE SegmentHandle;
 
 } RVM_IOCTL_SEGMENT_CREATE, *PRVM_IOCTL_SEGMENT_CREATE;
 
